@@ -109,6 +109,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // request instead of attaching a Bearer header from localStorage.
   const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, credentials: "include" });
 
+  if (res.status === 401) {
+    // The cookie is missing/expired server-side even though localStorage
+    // still thinks we're logged in (e.g. token expired, or cleared out of
+    // band). Drop the stale local session and bounce to login instead of
+    // leaving the user stuck looking at a raw error on the current page.
+    clearSession();
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.assign("/login");
+    }
+  }
+
   if (!res.ok) {
     let detail = res.statusText;
     try {
