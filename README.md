@@ -184,5 +184,3 @@ One thing I tried more deliberately here was implementing JWT authentication man
 - Real credentials should stay out of git. Use `.env.example` for placeholder values only.
 - Candidate deletion is handled as a soft archive (`status=archived` + `deleted_at` timestamp) rather than a hard delete.
 - Candidate creation (`POST /candidates`) and editing (`PATCH /candidates/{id}`) are admin-only; reviewers can view, filter, and score candidates but not create or edit them.
-- Score categories are constrained to the candidate's own listed skills (enforced server-side), matching the fixed `ROLE_OPTIONS`/`SKILL_OPTIONS` vocabularies used for filters and the create-candidate form.
-- **Consciously out of scope relative to a more full-featured version of this app**: a real LLM call for summaries (this build always uses a templated fallback summary, no API key required), refresh-token rotation, the SSE live-stream stretch goal, and an nginx/production frontend build — all skipped to stay within a focused scope, not oversights.
