@@ -144,6 +144,50 @@ function InternalNotesPanel({ notes, onSave }) {
   );
 }
 
+const STATUS_OPTIONS = ["new", "reviewed", "hired", "rejected", "archived"];
+
+function StatusControl({ status, onSave }) {
+  const [draft, setDraft] = useState(status);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(draft);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <select
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        className={`${inputClass} capitalize`}
+      >
+        {STATUS_OPTIONS.map((s) => (
+          <option key={s} value={s} className="capitalize">
+            {s}
+          </option>
+        ))}
+      </select>
+      <button
+        onClick={handleSave}
+        disabled={saving || draft === status}
+        className="rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-60"
+      >
+        {saving ? "Saving…" : "Save status"}
+      </button>
+      {error && <p className="text-sm text-danger">{error}</p>}
+    </div>
+  );
+}
+
 function Section({ title, aside, tone, children }) {
   return (
     <section
@@ -164,6 +208,7 @@ export default function CandidateDetail({
   onSubmitScore,
   onGenerateSummary,
   onSaveNotes,
+  onSaveStatus,
   onArchive,
 }) {
   const isAdmin = currentUser?.role === "admin";
@@ -198,13 +243,18 @@ export default function CandidateDetail({
             </div>
           )}
         </dl>
-        {isAdmin && candidate.status !== "archived" && (
-          <button
-            onClick={onArchive}
-            className="mt-5 rounded-md border border-status-rejected-soft px-3 py-1.5 text-sm text-status-rejected transition-colors hover:bg-status-rejected-soft"
-          >
-            Archive candidate
-          </button>
+        {isAdmin && (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4">
+            <StatusControl status={candidate.status} onSave={onSaveStatus} />
+            {candidate.status !== "archived" && (
+              <button
+                onClick={onArchive}
+                className="rounded-md border border-status-rejected-soft px-3 py-1.5 text-sm text-status-rejected transition-colors hover:bg-status-rejected-soft"
+              >
+                Archive candidate
+              </button>
+            )}
+          </div>
         )}
       </section>
 
@@ -231,7 +281,13 @@ export default function CandidateDetail({
             </div>
           ))}
         </div>
-        <ScoreForm candidate={candidate} onSubmit={onSubmitScore} />
+        {candidate.status === "archived" ? (
+          <p className="border-t border-hairline pt-4 text-sm text-ink-faint">
+            This candidate is archived — scoring is closed.
+          </p>
+        ) : (
+          <ScoreForm candidate={candidate} onSubmit={onSubmitScore} />
+        )}
       </Section>
 
       <Section title="AI Summary">

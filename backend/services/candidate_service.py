@@ -42,10 +42,17 @@ def search_candidates(
     pagination all happen as part of the SQL query (WHERE + LIMIT/OFFSET)
     instead of pulling the whole table into Python and slicing it there.
     """
-    conditions = [Candidate.deleted_at.is_(None)]
+    conditions = []
 
     if status:
         conditions.append(Candidate.status == status)
+        # Archived candidates are soft-deleted (deleted_at is set), so the
+        # default "hide deleted rows" rule below would otherwise mask them
+        # even when the caller is explicitly asking to see archived ones.
+        if status != "archived":
+            conditions.append(Candidate.deleted_at.is_(None))
+    else:
+        conditions.append(Candidate.deleted_at.is_(None))
     if role_applied:
         conditions.append(Candidate.role_applied == role_applied)
     if keyword:

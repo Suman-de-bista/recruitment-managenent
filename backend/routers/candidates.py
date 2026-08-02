@@ -117,7 +117,7 @@ def get_candidate(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    candidate = get_candidate_or_404(db, candidate_id)
+    candidate = get_candidate_or_404(db, candidate_id, include_deleted=True)
     return build_candidate_detail(db, candidate, current_user)
 
 
@@ -169,7 +169,7 @@ async def generate_candidate_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    candidate = get_candidate_or_404(db, candidate_id)
+    candidate = get_candidate_or_404(db, candidate_id, include_deleted=True)
     scores = get_visible_scores_query(db, candidate_id, current_user).all()
 
     # Simulates an async LLM call: network latency + generation delay. A
@@ -190,7 +190,7 @@ def list_candidate_scores(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    get_candidate_or_404(db, candidate_id)
+    get_candidate_or_404(db, candidate_id, include_deleted=True)
     is_admin = current_user.role == UserRole.ADMIN.value
     scores = get_visible_scores_query(db, candidate_id, current_user).order_by(Score.created_at.desc()).all()
     return [serialize_score(s, include_reviewer=is_admin) for s in scores]

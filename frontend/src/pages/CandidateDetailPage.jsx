@@ -56,6 +56,10 @@ export default function CandidateDetailPage() {
           await api.updateCandidate(id, { internal_notes: notes });
           await load();
         }}
+        onSaveStatus={async (status) => {
+          await api.updateCandidate(id, { status });
+          await load();
+        }}
         onArchive={async () => {
           await api.archiveCandidate(id);
           navigate("/");
