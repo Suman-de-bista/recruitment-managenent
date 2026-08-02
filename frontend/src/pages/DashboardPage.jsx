@@ -19,7 +19,10 @@ export default function DashboardPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    api.getCandidateOptions().then(setOptions).catch(() => {});
+    api
+      .getCandidateOptions()
+      .then(setOptions)
+      .catch((err) => setError(`Failed to load filter options: ${err.message}`));
   }, []);
 
   function refresh() {
