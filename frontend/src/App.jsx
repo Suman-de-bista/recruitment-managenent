@@ -11,12 +11,25 @@ function RequireAuth({ children }) {
   return children;
 }
 
+function RedirectIfAuthed({ children }) {
+  const { token } = getSession();
+  if (token) return <Navigate to="/" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <>
       <AppHeader />
       <Routes>
-        <Route path="/login" element={<AuthPage />} />
+        <Route
+          path="/login"
+          element={
+            <RedirectIfAuthed>
+              <AuthPage />
+            </RedirectIfAuthed>
+          }
+        />
         <Route
           path="/"
           element={
