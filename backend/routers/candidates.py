@@ -210,12 +210,30 @@ def create_candidate_score(
             detail="Score category must be one of the candidate's skills",
         )
 
-    score = Score(
-        candidate_id=candidate_id,
-        reviewer_id=current_user.id,  # always from the JWT, never from the request body
-        **payload.model_dump(),
+    # A reviewer scoring the same candidate in the same category again
+    # updates their existing score rather than adding another row — one
+    # score per reviewer per category keeps the average meaningful instead
+    # of letting a reviewer skew it by resubmitting.
+    score = (
+        db.query(Score)
+        .filter(
+            Score.candidate_id == candidate_id,
+            Score.reviewer_id == current_user.id,
+            Score.category == payload.category,
+        )
+        .first()
     )
-    db.add(score)
+    if score is not None:
+        score.score = payload.score
+        score.note = payload.note
+    else:
+        score = Score(
+            candidate_id=candidate_id,
+            reviewer_id=current_user.id,  # always from the JWT, never from the request body
+            **payload.model_dump(),
+        )
+        db.add(score)
+
     db.commit()
     db.refresh(score)
     is_admin = current_user.role == UserRole.ADMIN.value
