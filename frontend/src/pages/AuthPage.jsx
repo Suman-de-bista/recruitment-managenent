@@ -21,7 +21,7 @@ export default function AuthPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <p className="font-serif text-2xl font-semibold tracking-tight text-ink">TechKraft</p>
-          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-ink-faint">Reviewer Ledger</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-ink-faint">Recruitment Management</p>
         </div>
         <div className="rounded-lg border border-hairline bg-surface p-6 shadow-sm">
           <h1 className="mb-4 font-serif text-lg font-semibold text-ink">
@@ -38,9 +38,6 @@ export default function AuthPage() {
             </button>
           </p>
         </div>
-        <p className="mt-4 text-center text-xs text-ink-faint">
-          Seeded accounts: admin@example.com / reviewer@example.com — see README for password.
-        </p>
       </div>
     </div>
   );

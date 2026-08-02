@@ -11,7 +11,7 @@ export default function AppHeader() {
       <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
         <div className="flex items-baseline gap-2">
           <span className="font-serif text-lg font-semibold tracking-tight text-ink">TechKraft</span>
-          <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">Reviewer Ledger</span>
+          <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">Recruitment Management</span>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm">
