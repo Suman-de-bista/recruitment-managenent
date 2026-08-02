@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.utils import get_current_user, require_admin
+from app.utils import get_current_user, is_admin, require_admin
 from app.database import get_db
-from app.models import Candidate, CandidateStatus, Score, User, UserRole
+from app.models import Candidate, CandidateStatus, Score, User
 from app.schemas import (
     CandidateCreate,
     CandidateDetail,
@@ -38,7 +38,7 @@ def get_candidate_or_404(db: Session, candidate_id: int, *, include_deleted: boo
 
 def get_visible_scores_query(db: Session, candidate_id: int, current_user: User):
     query = db.query(Score).filter(Score.candidate_id == candidate_id)
-    if current_user.role != UserRole.ADMIN.value:
+    if not is_admin(current_user):
         query = query.filter(Score.reviewer_id == current_user.id)
     return query
 
@@ -51,7 +51,7 @@ def serialize_score(score: Score, *, include_reviewer: bool) -> ScoreRead:
 
 
 def build_candidate_detail(db: Session, candidate: Candidate, current_user: User) -> CandidateDetail:
-    is_admin = current_user.role == UserRole.ADMIN.value
+    admin = is_admin(current_user)
     data = {
         "id": candidate.id,
         "name": candidate.name,
@@ -59,7 +59,7 @@ def build_candidate_detail(db: Session, candidate: Candidate, current_user: User
         "role_applied": candidate.role_applied,
         "skills": candidate.skills,
         "status": candidate.status,
-        "internal_notes": candidate.internal_notes if is_admin else None,
+        "internal_notes": candidate.internal_notes if admin else None,
         "ai_summary": candidate.ai_summary,
         "ai_summary_generated_at": candidate.ai_summary_generated_at,
         "created_at": candidate.created_at,
@@ -68,7 +68,7 @@ def build_candidate_detail(db: Session, candidate: Candidate, current_user: User
     scores = (
         get_visible_scores_query(db, candidate.id, current_user).order_by(Score.created_at.desc()).all()
     )
-    data["scores"] = [serialize_score(s, include_reviewer=is_admin) for s in scores]
+    data["scores"] = [serialize_score(s, include_reviewer=admin) for s in scores]
     return CandidateDetail(**data)
 
 
@@ -191,9 +191,9 @@ def list_candidate_scores(
     current_user: User = Depends(get_current_user),
 ):
     get_candidate_or_404(db, candidate_id, include_deleted=True)
-    is_admin = current_user.role == UserRole.ADMIN.value
+    admin = is_admin(current_user)
     scores = get_visible_scores_query(db, candidate_id, current_user).order_by(Score.created_at.desc()).all()
-    return [serialize_score(s, include_reviewer=is_admin) for s in scores]
+    return [serialize_score(s, include_reviewer=admin) for s in scores]
 
 
 @router.post("/{candidate_id}/scores", response_model=ScoreRead, status_code=status.HTTP_201_CREATED)
@@ -236,5 +236,4 @@ def create_candidate_score(
 
     db.commit()
     db.refresh(score)
-    is_admin = current_user.role == UserRole.ADMIN.value
-    return serialize_score(score, include_reviewer=is_admin)
+    return serialize_score(score, include_reviewer=is_admin(current_user))
