@@ -125,6 +125,14 @@ Admin: archive (soft-delete) a candidate:
 curl -X DELETE http://localhost:8000/api/v1/candidates/1 -H "Authorization: Bearer <admin_token>"
 ```
 
+Stream live score updates for a candidate (SSE):
+
+```bash
+curl -N http://localhost:8000/api/v1/candidates/1/stream -H "Authorization: Bearer <token>"
+```
+
+Leave that running and submit a score for candidate 1 from another terminal — a `score_updated` event appears on the stream within a second. (`-N` disables curl's response buffering so events show up as they arrive instead of only at the end.)
+
 ## Architecture Decision Record
 
 ### 1. FastAPI For The Backend
@@ -176,7 +184,7 @@ That lets the database use indexes and return only the requested page. This proj
 
 ## Learning Reflection
 
-One thing I tried more deliberately here was implementing JWT authentication manually instead of relying on a full auth package (`python-jose`/`passlib`) — hand-rolling the base64url encoding, HMAC signing, and PBKDF2 password hashing made the token lifecycle much easier to reason about end-to-end. Given more time, I would explore rotating refresh tokens, the SSE stretch goal for live score updates, and replacing SQLite with PostgreSQL for a deployment-ready setup.
+One thing I tried more deliberately here was implementing JWT authentication manually instead of relying on a full auth package (`python-jose`/`passlib`) — hand-rolling the base64url encoding, HMAC signing, and PBKDF2 password hashing made the token lifecycle much easier to reason about end-to-end. I also built the SSE stretch goal (`GET /candidates/{id}/stream`) using an in-process `asyncio.Queue` per connected client, keyed by candidate ID — the interesting part was making sure the httpOnly cookie auth still worked over `EventSource`, which just needed `withCredentials: true` on the frontend rather than any special backend handling. Given more time, I would explore rotating refresh tokens, a shared broker (Redis pub/sub) so the SSE stream works across multiple backend workers instead of just one process, and replacing SQLite with PostgreSQL for a deployment-ready setup.
 
 ## Notes
 
@@ -184,3 +192,4 @@ One thing I tried more deliberately here was implementing JWT authentication man
 - Real credentials should stay out of git. Use `.env.example` for placeholder values only.
 - Candidate deletion is handled as a soft archive (`status=archived` + `deleted_at` timestamp) rather than a hard delete.
 - Candidate creation (`POST /candidates`) and editing (`PATCH /candidates/{id}`) are admin-only; reviewers can view, filter, and score candidates but not create or edit them.
+- The SSE stream (`GET /candidates/{id}/stream`) only pushes score create/update events, matching the assignment's "streams score updates in real time" wording — status changes, notes edits, and summary generation still just refresh on save. It's also single-process (an in-memory `asyncio.Queue` per connection), so it only works correctly with one backend worker; a multi-worker deployment would need a shared broker instead.
