@@ -98,19 +98,16 @@ export interface Message {
   detail: string;
 }
 
-function getToken(): string | null {
-  return localStorage.getItem("token");
-}
-
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string> | undefined),
   };
-  if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  // Auth is carried by an httpOnly cookie the backend sets on login, never
+  // touched by JS — credentials:"include" sends it automatically on every
+  // request instead of attaching a Bearer header from localStorage.
+  const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, credentials: "include" });
 
   if (!res.ok) {
     let detail = res.statusText;
@@ -132,6 +129,8 @@ export const api = {
     request<User>("/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }),
   login: (email: string, password: string) =>
     request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  logout: () => request<Message>("/auth/logout", { method: "POST" }),
+  me: () => request<User>("/auth/me"),
 
   getCandidateOptions: () => request<CandidateOptions>("/candidates/options"),
   listCandidates: (params: CandidateListFilters) => {
@@ -155,18 +154,24 @@ export const api = {
     request<Score>(`/candidates/${id}/scores`, { method: "POST", body: JSON.stringify(payload) }),
 };
 
-export function saveSession(token: string, user: User): void {
-  localStorage.setItem("token", token);
+// The access token itself lives only in an httpOnly cookie set by the
+// backend — JS never sees it. localStorage here only mirrors the
+// non-sensitive `user` object (email/role) so the UI can render
+// synchronously without waiting on a network round-trip, plus a plain
+// "was logged in" flag for client-side route guarding. The cookie is what
+// actually authorizes requests; this flag is just a UI hint.
+
+export function saveSession(user: User): void {
+  localStorage.setItem("authed", "1");
   localStorage.setItem("user", JSON.stringify(user));
 }
 
 export function clearSession(): void {
-  localStorage.removeItem("token");
+  localStorage.removeItem("authed");
   localStorage.removeItem("user");
 }
 
-export function getSession(): { token: string | null; user: User | null } {
-  const token = getToken();
+export function getSession(): { isAuthed: boolean; user: User | null } {
   const rawUser = localStorage.getItem("user");
-  return { token, user: rawUser ? JSON.parse(rawUser) : null };
+  return { isAuthed: localStorage.getItem("authed") === "1", user: rawUser ? JSON.parse(rawUser) : null };
 }

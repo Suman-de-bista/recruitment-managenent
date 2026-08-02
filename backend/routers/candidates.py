@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user, require_admin
+from app.utils import get_current_user, require_admin
 from app.database import get_db
 from app.models import Candidate, CandidateStatus, Score, User, UserRole
 from app.schemas import (

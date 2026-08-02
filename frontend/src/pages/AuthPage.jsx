@@ -11,8 +11,8 @@ export default function AuthPage() {
     if (mode === "register") {
       await api.register(email, password);
     }
-    const { access_token, user } = await api.login(email, password);
-    saveSession(access_token, user);
+    const { user } = await api.login(email, password);
+    saveSession(user);
     navigate("/");
   }
 

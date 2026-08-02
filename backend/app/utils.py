@@ -6,7 +6,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -16,8 +16,25 @@ from app.models import User, UserRole
 
 JWT_ALGORITHM = "HS256"
 PASSWORD_ITERATIONS = 210_000
+ACCESS_TOKEN_COOKIE_NAME = "access_token"
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=ACCESS_TOKEN_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    response.delete_cookie(key=ACCESS_TOKEN_COOKIE_NAME, path="/")
 
 
 def hash_password(password: str) -> str:
@@ -103,17 +120,26 @@ def decode_access_token(token: str) -> dict[str, Any]:
 
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    # An explicit Bearer header (curl, the API docs, tests) always wins when
+    # present, since sending one is a deliberate act by the caller. Browser
+    # requests from the frontend don't send one at all and rely purely on
+    # the httpOnly cookie set on login.
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        token = credentials.credentials
+    else:
+        token = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+        if token is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token(token)
     subject = payload.get("sub")
     try:
         user_id = int(subject)

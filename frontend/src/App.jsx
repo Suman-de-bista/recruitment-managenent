@@ -6,14 +6,14 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import CandidateDetailPage from "./pages/CandidateDetailPage.jsx";
 
 function RequireAuth({ children }) {
-  const { token } = getSession();
-  if (!token) return <Navigate to="/login" replace />;
+  const { isAuthed } = getSession();
+  if (!isAuthed) return <Navigate to="/login" replace />;
   return children;
 }
 
 function RedirectIfAuthed({ children }) {
-  const { token } = getSession();
-  if (token) return <Navigate to="/" replace />;
+  const { isAuthed } = getSession();
+  if (isAuthed) return <Navigate to="/" replace />;
   return children;
 }
 

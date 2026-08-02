@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.auth import hash_password
+from app.utils import hash_password
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.models import Candidate, CandidateStatus, Score, User, UserRole

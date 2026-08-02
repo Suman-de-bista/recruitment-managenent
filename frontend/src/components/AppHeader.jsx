@@ -1,10 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import { clearSession, getSession } from "../api/client";
+import { api, clearSession, getSession } from "../api/client";
 
 export default function AppHeader() {
-  const { token, user } = getSession();
+  const { isAuthed, user } = getSession();
   const navigate = useNavigate();
-  if (!token) return null;
+  if (!isAuthed) return null;
 
   return (
     <header className="border-b border-hairline bg-surface">
@@ -21,9 +21,13 @@ export default function AppHeader() {
             <span className="text-ink-muted">{user?.email}</span>
           </div>
           <button
-            onClick={() => {
-              clearSession();
-              navigate("/login");
+            onClick={async () => {
+              try {
+                await api.logout();
+              } finally {
+                clearSession();
+                navigate("/login");
+              }
             }}
             className="rounded-md border border-hairline px-3 py-1.5 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
           >

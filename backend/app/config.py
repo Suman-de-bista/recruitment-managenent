@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "dev-secret-key-change-me"
     access_token_expire_minutes: int = 60
     cors_origins: str = "http://localhost:5173"
+    cookie_secure: bool = False
 
     seed_admin_email: str = "admin@example.com"
     seed_admin_password: str = "admin@123"
