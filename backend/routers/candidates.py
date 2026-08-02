@@ -1,7 +1,10 @@
 import asyncio
+import json
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -24,6 +27,27 @@ from app.schemas import (
 from services.candidate_service import build_fallback_summary, search_candidates
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
+
+# In-process pub/sub for the SSE stretch goal: one asyncio.Queue per
+# connected client, grouped by candidate_id. Good enough for a single
+# backend instance/demo; a multi-worker deployment would need a shared
+# broker (e.g. Redis pub/sub) instead since queues here are per-process.
+score_streams: dict[int, list[asyncio.Queue]] = defaultdict(list)
+
+
+async def publish_score_event(candidate_id: int, score: Score) -> None:
+    event = {
+        "type": "score_updated",
+        "score": {
+            "id": score.id,
+            "candidate_id": score.candidate_id,
+            "category": score.category,
+            "score": score.score,
+            "reviewer_id": score.reviewer_id,
+        },
+    }
+    for queue in score_streams.get(candidate_id, []):
+        await queue.put(event)
 
 
 def get_candidate_or_404(db: Session, candidate_id: int, *, include_deleted: bool = False) -> Candidate:
@@ -197,7 +221,7 @@ def list_candidate_scores(
 
 
 @router.post("/{candidate_id}/scores", response_model=ScoreRead, status_code=status.HTTP_201_CREATED)
-def create_candidate_score(
+async def create_candidate_score(
     candidate_id: int,
     payload: ScoreCreate,
     db: Session = Depends(get_db),
@@ -236,4 +260,49 @@ def create_candidate_score(
 
     db.commit()
     db.refresh(score)
+    await publish_score_event(candidate_id, score)
     return serialize_score(score, include_reviewer=is_admin(current_user))
+
+
+@router.get("/{candidate_id}/stream")
+async def stream_candidate_scores(
+    candidate_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """SSE stretch goal: streams live score updates for a candidate.
+
+    Reviewers only receive events for their own scores (matching the
+    visibility rule everywhere else); admins receive all. Auth works the
+    same as every other endpoint — the browser's EventSource sends the
+    httpOnly cookie automatically when created with withCredentials: true.
+    """
+    get_candidate_or_404(db, candidate_id, include_deleted=True)
+    admin = is_admin(current_user)
+
+    queue: asyncio.Queue = asyncio.Queue()
+    score_streams[candidate_id].append(queue)
+
+    async def event_generator():
+        try:
+            yield "event: connected\ndata: {}\n\n"
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=25)
+                except asyncio.TimeoutError:
+                    yield "event: heartbeat\ndata: {}\n\n"
+                    continue
+
+                if not admin and event["score"]["reviewer_id"] != current_user.id:
+                    continue
+                yield f"event: score_updated\ndata: {json.dumps(event['score'])}\n\n"
+        finally:
+            queues = score_streams.get(candidate_id, [])
+            if queue in queues:
+                queues.remove(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

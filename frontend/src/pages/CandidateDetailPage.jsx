@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, getSession } from "../api/client";
+import { API_BASE_URL, api, getSession } from "../api/client";
 import CandidateDetail from "../components/CandidateDetail.jsx";
 
 export default function CandidateDetailPage() {
@@ -24,6 +24,23 @@ export default function CandidateDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // SSE stretch goal: live score updates. The httpOnly auth cookie rides
+  // along automatically because withCredentials is set — no token needs to
+  // be exposed in the URL. Any score_updated event just re-fetches the
+  // candidate, keeping this simple and consistent with every other mutation
+  // in the app (no separate client-side merge logic to get wrong).
+  useEffect(() => {
+    const source = new EventSource(`${API_BASE_URL}/candidates/${id}/stream`, {
+      withCredentials: true,
+    });
+    source.addEventListener("score_updated", () => {
+      load();
+    });
+    return () => {
+      source.close();
+    };
+  }, [id, load]);
 
   if (loading) {
     return <div className="mx-auto max-w-4xl px-4 py-8 text-sm text-ink-faint sm:px-6">Loading candidate…</div>;
